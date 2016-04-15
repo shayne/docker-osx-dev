@@ -3,7 +3,7 @@
 # A script for running a productive development environment with Docker
 # on OS X. See https://github.com/brikis98/docker-osx-dev for more info.
 
-set -e
+# set -e
 
 # Console colors
 readonly COLOR_DEBUG='\033[1;36m'
@@ -19,8 +19,9 @@ readonly LOG_LEVEL_INFO="INFO"
 readonly LOG_LEVEL_WARN="WARN"
 readonly LOG_LEVEL_ERROR="ERROR"
 readonly LOG_LEVEL_INSTRUCTIONS="INSTRUCTIONS"
-readonly LOG_LEVELS="$LOG_LEVEL_DEBUG $LOG_LEVEL_INFO $LOG_LEVEL_WARN $LOG_LEVEL_ERROR $LOG_LEVEL_INSTRUCTIONS"
 readonly DEFAULT_LOG_LEVEL="$LOG_LEVEL_INFO"
+LOG_LEVELS=("$LOG_LEVEL_DEBUG" "$LOG_LEVEL_INFO" "$LOG_LEVEL_WARN" "$LOG_LEVEL_ERROR" "$LOG_LEVEL_INSTRUCTIONS")
+readonly LOG_LEVELS
 
 # Environment variable file constants
 readonly BASH_PROFILE="$HOME/.bash_profile"
@@ -73,10 +74,10 @@ DOCKER_HOST_SSH_COMMAND=""
 # Dumps a 'stack trace' for failed assertions.
 #
 function backtrace {
-  local readonly max_trace=20
+  local -r max_trace=20
   local frame=0
   while test $frame -lt $max_trace ; do
-    frame=$(( $frame + 1 ))
+    frame=$(( frame + 1 ))
     local bt_file=${BASH_SOURCE[$frame]}
     local bt_function=${FUNCNAME[$frame]}
     local bt_line=${BASH_LINENO[$frame-1]}  # called 'from' this line
@@ -92,7 +93,7 @@ function backtrace {
 # Asserts that VAR is not empty and exits with an error code if it is.
 #
 function assert_non_empty {
-  local readonly var="$1"
+  local -r var="$1"
 
   if test -z "$var" ; then
     log_error "internal error: unexpected empty-string argument"
@@ -107,10 +108,10 @@ function assert_non_empty {
 # Asserts that at most one of VAR1, VAR2, ..., VARn is not empty
 #
 function assert_mutually_exclusive {
-  local readonly error_message=$1
+  local -r error_message=$1
   shift
   local found
-  while [[ $# > 0 ]]; do
+  while [[ $# -gt 0 ]]; do
     local value=$1
     if test -n "$value" ; then
       if test -n "$found" ; then
@@ -145,9 +146,9 @@ function assert_mutually_exclusive {
 #   Returns 2
 #
 function index_of {
-  local readonly value="$1"
+  local -r value="$1"
   shift
-  local readonly array=("$@")
+  local -r array=("$@")
   local i=0
 
   for (( i = 0; i < ${#array[@]}; i++ )); do
@@ -171,9 +172,9 @@ function index_of {
 #   Returns: "A, B, C"
 #
 function join {
-  local readonly separator="$1"
+  local -r separator="$1"
   shift
-  local readonly values=("$@")
+  local -r values=("$@")
 
   printf "%s$separator" "${values[@]}" | sed "s/$separator$//"
 }
@@ -235,11 +236,11 @@ function log {
     do_log "$@"
   elif [[ "$#" -eq 4 ]]; then
     local message=""
-    while read message; do
+    while read -r message; do
       do_log "$1" "$2" "$3" "$4" "$message"
     done
   else
-    echo "Internal error: invalid number of arguments passed to log function: $@"
+    echo "Internal error: invalid number of arguments passed to log function: $*"
     exit 1
   fi
 }
@@ -257,18 +258,19 @@ function log {
 #   Prints: "\033[0;32m[INFO] Hello, World\033[0m" to stdout.
 #
 function do_log {
-  local readonly color="$1"
+  local -r color="$1"
   shift
-  local readonly color_end="$1"
+  local -r color_end="$1"
   shift
-  local readonly timestamp="$1"
+  local -r timestamp="$1"
   shift
-  local readonly log_level="$1"
+  local -r log_level="$1"
   shift
-  local readonly message="$@"
+  local -r message="$*"
+  local -r log_levels=(${LOG_LEVELS[*]})
 
-  local readonly log_level_index=$(index_of "$log_level" $LOG_LEVELS)
-  local readonly current_log_level_index=$(index_of "$CURRENT_LOG_LEVEL" $LOG_LEVELS)
+  local -r log_level_index=$(index_of "$log_level" "${log_levels[@]}")
+  local -r current_log_level_index=$(index_of "$CURRENT_LOG_LEVEL" "${log_levels[@]}")
 
   if [[ "$log_level_index" -ge "$current_log_level_index" ]]; then
     echo -e "${color}${timestamp} [${log_level}] ${message}${color_end}"
@@ -282,8 +284,8 @@ function do_log {
 # LOG_LEVELS.
 #
 function assert_valid_log_level {
-  local readonly level="$1"
-  local readonly index=$(index_of "$level" $LOG_LEVELS)
+  local -r level="$1"
+  local -r index=$(index_of "$level" "${LOG_LEVELS[@]}")
 
   if [[ "$index" -lt 0 ]]; then
     echo "Invalid log level specified: $level"
@@ -298,7 +300,7 @@ function assert_valid_log_level {
 # Set the logging level to LEVEL. LEVEL must be one of the values in LOG_LEVELS.
 #
 function configure_log_level {
-  local readonly level="$1"
+  local -r level="$1"
   assert_valid_log_level "$level"
   CURRENT_LOG_LEVEL="$level"
 }
@@ -335,7 +337,7 @@ function find_vboxsf_mounted_folders {
 # find_vboxsf_mounted_folders function.
 #
 function umount_vboxsf_mounted_folder {
-  local readonly vbox_shared_folders="$1"
+  local -r vbox_shared_folders="$1"
   local vbox_shared_folder=''
   while read -r vbox_shared_folder; do
     log_info "Removing shared folder: $vbox_shared_folder"
@@ -352,8 +354,8 @@ function umount_vboxsf_mounted_folder {
 # prompting the user.
 #
 function check_for_shared_folders {
-  local readonly remove_shared_folders="$1"
-  local readonly vbox_shared_folders=$(find_vboxsf_mounted_folders)
+  local -r remove_shared_folders="$1"
+  local -r vbox_shared_folders=$(find_vboxsf_mounted_folders)
 
   if [[ ! -z "$vbox_shared_folders" ]]; then
     log_error "Found VirtualBox shared folders on your Boot2Docker VM. These may void any performance benefits from using docker-osx-dev:\n$vbox_shared_folders"
@@ -391,7 +393,7 @@ function is_boot2docker_initialized {
 # Returns true iff the Boot2Docker VM is running
 #
 function is_boot2docker_running {
-  local readonly status=$(boot2docker status 2>&1)
+  local -r status=$(boot2docker status 2>&1)
   test "$status" = "running"
 }
 
@@ -401,7 +403,7 @@ function is_boot2docker_running {
 # Initializes and starts up the Boot2Docker VM.
 #
 function init_boot2docker {
-  local readonly remove_shared_folders=$1
+  local -r remove_shared_folders=$1
 
   if ! is_boot2docker_initialized; then
     log_info "Initializing Boot2Docker VM"
@@ -427,10 +429,10 @@ function init_boot2docker {
 #
 function inspect_docker_machine {
   local result=$(docker-machine inspect --format="$*" "$DOCKER_MACHINE_NAME" 2>&1)
-  if test "${result}" != "<no value>"; then
-    echo ${result}
+  if test "$result" != "<no value>"; then
+    echo "$result"
   else
-    return -1
+    return 1
   fi
 }
 
@@ -468,13 +470,13 @@ function configure_docker_machine {
 # Initializes and starts up the docker-machine VM.
 #
 function init_docker_machine {
-  local readonly remove_shared_folders=$1
+  local -r remove_shared_folders=$1
 
   if ! is_docker_machine_running; then
     log_info "Initializing docker machine $DOCKER_MACHINE_NAME"
     docker-machine start "$DOCKER_MACHINE_NAME"
   fi
-  eval "$(docker-machine env --shell bash $DOCKER_MACHINE_NAME)"
+  eval "$(docker-machine env --shell bash "$DOCKER_MACHINE_NAME")"
   configure_docker_machine
   if [[ $DOCKER_MACHINE_DRIVER_NAME == "virtualbox" ]]; then
     check_for_shared_folders "$remove_shared_folders"
@@ -486,7 +488,7 @@ function init_docker_machine {
 #
 function is_docker_machine_running {
   log_info "Testing if docker machine is running"
-  local readonly status=$(docker-machine status $DOCKER_MACHINE_NAME 2>&1)
+  local -r status=$(docker-machine status "$DOCKER_MACHINE_NAME" 2>&1)
   test "$status" = "Running"
 }
 
@@ -501,7 +503,7 @@ function is_docker_machine_running {
 # Initializes boot2docker, unless DOCKER_MACHINE_NAME is defined
 #
 function init_docker_host {
-  local readonly remove_shared_folders=$1
+  local -r remove_shared_folders=$1
   if [[ -n "$DOCKER_MACHINE_NAME" ]]; then
     init_docker_machine "$remove_shared_folders"
   else
@@ -541,10 +543,10 @@ function install_rsync_on_docker_host {
 # Returns 0 when VAR is defined for new shells, 1 otherwise.
 #
 function env_is_defined {
-  local readonly var="$1"
+  local -r var="$1"
   assert_non_empty "$var"
 
-  local readonly setting=$(env | grep "^${var}=")
+  local -r setting=$(env | grep "^${var}=")
   test -n "$setting"
 }
 
@@ -573,9 +575,9 @@ function get_env_file {
 #
 function add_environment_variables {
   if [ -z "$DOCKER_MACHINE_NAME" ]; then
-    local readonly env_file=$(get_env_file)
-    local readonly boot2docker_exports=$(boot2docker shellinit 2>/dev/null)
-    local readonly exports_to_add_to_env_file=$(determine_boot2docker_exports_for_env_file "$boot2docker_exports")
+    local -r env_file=$(get_env_file)
+    local -r boot2docker_exports=$(boot2docker shellinit 2>/dev/null)
+    local -r exports_to_add_to_env_file=$(determine_boot2docker_exports_for_env_file "$boot2docker_exports")
 
     if [[ ! -z "$exports_to_add_to_env_file" ]]; then
       log_info "Adding new environment variables to $env_file: $exports_to_add_to_env_file"
@@ -595,14 +597,14 @@ function add_environment_variables {
 # not already in the current environment.
 #
 function determine_boot2docker_exports_for_env_file {
-  local readonly boot2docker_exports="$1"
+  local -r boot2docker_exports="$1"
 
   local exports_to_add_to_env_file=()
   local export_line=""
 
   while read -r export_line; do
     if [[ ! -z "$export_line" ]]; then
-      local readonly var_name=$(echo "$export_line" | sed -ne 's/export \(.*\)=.*/\1/p')
+      local var_name=$(echo "$export_line" | sed -ne 's/export \(.*\)=.*/\1/p')
 
       if [[ -z "$var_name" ]]; then
         log_error "Unexpected entry from boot2docker shellinit: $export_line"
@@ -629,7 +631,7 @@ function add_docker_host {
     log_warn "$HOSTS_FILE already contains $DOCKER_HOST_NAME, will not overwrite"
   else
     DOCKER_HOST_IP=${DOCKER_HOST_IP-$(boot2docker ip)}
-    local readonly host_entry="\n$DOCKER_HOST_IP $DOCKER_HOST_NAME"
+    local -r host_entry="\n$DOCKER_HOST_IP $DOCKER_HOST_NAME"
 
     log_info "Adding $DOCKER_HOST_NAME entry to $HOSTS_FILE so you can use http://$DOCKER_HOST_NAME URLs for testing"
     log_instructions "Modifying $HOSTS_FILE requires sudo privileges, please enter your password."
@@ -646,7 +648,7 @@ function add_docker_host {
 # error code if any of the requirements are missing.
 #
 function check_prerequisites {
-  local readonly os=$(uname)
+  local -r os=$(uname)
 
   if [[ ! "$os" = "Darwin" ]]; then
     log_error "This script should only be run on OS X"
@@ -683,13 +685,13 @@ function brew_update {
 #   `type vboxwebsrv` succeeds, and if not, uses brew cask to install it.
 #
 function brew_install {
-  local readonly package_name="$1"
-  local readonly readable_name="$2"
-  local readonly existence_test="$3"
-  local readonly use_cask="$4"
+  local -r package_name="$1"
+  local -r readable_name="$2"
+  local -r existence_test="$3"
+  local -r use_cask="$4"
 
   if ! eval "$existence_test" > /dev/null 2>&1 ; then
-    check_homebrew $readable_name
+    check_homebrew "$readable_name"
 
     local brew_command="brew"
     if [[ "$use_cask" = true ]]; then
@@ -722,7 +724,7 @@ function brew_install {
 # Called only in case of a missing dependency.
 #
 function check_homebrew {
-  local readonly missing_package="$1"
+  local -r missing_package="$1"
   if ! type brew > /dev/null 2>&1 ; then
     log_error "HomeBrew is required to install $missing_package, but it's not installed. Aborting."
     exit 1
@@ -775,13 +777,13 @@ function print_next_steps {
 # transform one of these nested paths back to one of the top level rsync paths.
 #
 function find_path_to_sync_parent {
-  local readonly path="$1"
-  local readonly normalized_path=$(greadlink -m $(eval echo '$path'))
-  local readonly paths_to_sync=($PATHS_TO_SYNC)
+  local -r path="$1"
+  local -r normalized_path=$(greadlink -m "$path")
+  local -r paths_to_sync=($PATHS_TO_SYNC)
 
   local path_to_sync=""
   for path_to_sync in "${paths_to_sync[@]}"; do
-    if [[ "$normalized_path" == $path_to_sync || "$normalized_path" == $path_to_sync\/* ]]; then
+    if [[ "$normalized_path" == "$path_to_sync" || "$normalized_path" == $path_to_sync\/* ]]; then
       echo "$path_to_sync"
       return
     fi
@@ -799,25 +801,25 @@ function find_path_to_sync_parent {
 #   Result: the contents of /foo are rsync'ed to /foo on the Boot2Docker VM
 #
 function do_rsync {
-  local readonly path="$1"
-  local readonly path_to_sync=$(find_path_to_sync_parent "$path")
+  local -r path="$1"
+  local -r path_to_sync=$(find_path_to_sync_parent "$path")
 
   if [[ -z "$path_to_sync" ]]; then
     log_error "Internal error: can't sync '$path' because it doesn't seem to be part of any paths configured for syncing: $PATHS_TO_SYNC"
   else
-    local readonly parent_folder=$(dirname "$path_to_sync")
+    local -r parent_folder=$(dirname "$path_to_sync")
 
     local excludes=()
-    read -a excludes <<< "$EXCLUDES"
-    local readonly exclude_flags="${excludes[@]/#/--exclude }"
+    read -ra excludes <<< "$EXCLUDES"
+    local -r exclude_flags="${excludes[*]/#/--exclude }"
 
     local includes=()
-    read -a includes <<< "$INCLUDES"
-    local readonly include_flags="${includes[@]/#/--include }"
+    read -ra includes <<< "$INCLUDES"
+    local -r include_flags="${includes[*]/#/--include }"
 
-    local readonly rsh_flag="--rsh=\"ssh -i $DOCKER_HOST_SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\""
+    local -r rsh_flag="--rsh=\"ssh -i $DOCKER_HOST_SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\""
 
-    local readonly rsync_cmd="rsync $RSYNC_FLAGS $include_flags $exclude_flags $rsh_flag $path_to_sync $DOCKER_HOST_SSH_URL:$parent_folder 2>&1 | grep -v \"^Warning: Permanently added\""
+    local -r rsync_cmd="rsync $RSYNC_FLAGS $include_flags $exclude_flags $rsh_flag $path_to_sync $DOCKER_HOST_SSH_URL:$parent_folder 2>&1 | grep -v \"^Warning: Permanently added\""
     log_debug "$rsync_cmd"
 
     eval "$rsync_cmd" 2>&1 | log_info
@@ -836,7 +838,7 @@ function do_rsync {
 #   Result: /foo and /bar are rsync'ed to the Boot2DockerVM
 #
 function do_sync {
-  local readonly paths_to_sync=("$@")
+  local -r paths_to_sync=("$@")
   local path=""
 
   for path in "${paths_to_sync[@]}"; do
@@ -850,22 +852,22 @@ function do_sync {
 # Sets up all necessary parent directories and permissions for PATHS in the
 # Boot2Docker VM.
 function create_sync_directories {
-  local readonly paths_to_sync=("$@")
+  local -r paths_to_sync=("$@")
 
   local dirs_to_create=()
   local path=""
 
   for path in "${paths_to_sync[@]}"; do
-    local readonly parent_dir=$(dirname "$path")
+    local -r parent_dir=$(dirname "$path")
     if [[ "$parent_dir" != "/" ]]; then
       dirs_to_create+=("$parent_dir")
     fi
   done
 
-  local readonly dir_string=$(join " " "${dirs_to_create[@]}")
-  local readonly mkdir_string="sudo mkdir -p $dir_string"
-  local readonly chown_string="sudo chown -R $DOCKER_HOST_USER $dir_string"
-  local readonly ssh_cmd="$mkdir_string && $chown_string"
+  local -r dir_string=$(join " " "${dirs_to_create[@]}")
+  local -r mkdir_string="sudo mkdir -p $dir_string"
+  local -r chown_string="sudo chown -R $DOCKER_HOST_USER $dir_string"
+  local -r ssh_cmd="$mkdir_string && $chown_string"
 
   log_debug "Creating parent directories in Docker VM: $ssh_cmd"
   $DOCKER_HOST_SSH_COMMAND "$ssh_cmd"
@@ -877,15 +879,15 @@ function create_sync_directories {
 # Use tar to set up the initial sync of PATHS in the Boot2Docker VM, which
 # is faster than letting rsync do it.
 function tar_sync {
-  local readonly paths_to_sync=("$@")
+  local -r paths_to_sync=("$@")
 
   local path=""
   local parent_dir=""
   local base_name=""
-  local readonly excludes=($EXCLUDES)
-  local readonly exclude_flags=${excludes[@]/#/--exclude }
-  local readonly includes=($INCLUDES)
-  local readonly include_flags=${includes[@]/#/--include }
+  local -r excludes=($EXCLUDES)
+  local -r exclude_flags=${excludes[*]/#/--exclude }
+  local -r includes=($INCLUDES)
+  local -r include_flags=${includes[*]/#/--include }
 
   for path in "${paths_to_sync[@]}"; do
     parent_dir=$(dirname "$path")
@@ -894,7 +896,7 @@ function tar_sync {
       log_debug "skipped tar for $parent_dir/$base_name"
     else
       log_info "Initial sync using tar for $parent_dir/$base_name"
-      tar -cC "$parent_dir" $include_flags $exclude_flags "$base_name" | $DOCKER_HOST_SSH_COMMAND "tar -xC '$parent_dir'"
+      tar -cC "$parent_dir" "$include_flags" "$exclude_flags" "$base_name" | $DOCKER_HOST_SSH_COMMAND "tar -xC '$parent_dir'"
     fi
   done
 }
@@ -906,14 +908,14 @@ function tar_sync {
 # setting up all necessary parent directories and permissions.
 #
 function initial_sync {
-  local readonly paths_to_sync=($PATHS_TO_SYNC)
-  log_info "Performing initial sync of paths: ${paths_to_sync[@]}"
+  local -r paths_to_sync=($PATHS_TO_SYNC)
+  log_info "Performing initial sync of paths: ${paths_to_sync[*]}"
 
   create_sync_directories "${paths_to_sync[@]}"
 
   tar_sync "${paths_to_sync[@]}"
 
-  log_debug "Starting sync paths: $paths_to_sync"
+  log_debug "Starting sync paths: ${paths_to_sync[*]}"
   do_sync "${paths_to_sync[@]}"
   log_info "Initial sync done"
 }
@@ -927,11 +929,11 @@ function initial_sync {
 function watch {
   log_info "Watching: $PATHS_TO_SYNC"
 
-  local readonly fswatch_cmd="fswatch -0 $PATHS_TO_SYNC"
+  local -r fswatch_cmd="fswatch -0 $PATHS_TO_SYNC"
   log_debug "$fswatch_cmd"
 
   local file=""
-  eval "$fswatch_cmd" | while read -d "" file
+  eval "$fswatch_cmd" | while read -rd "" file
   do
     do_sync "$file"
   done
@@ -965,7 +967,7 @@ function instructions {
   echo -e "      --only-dependencies\t\tDuring install, only install the homebrew dependencies. Useful if homebrew is needs to be run as a different user."
   echo -e "      --skip-dependencies\t\tDuring install, don't install the homebrew dependencies. Useful if homebrew is needs to be run as a different user."
   echo -e "  -r, --remove-shared-folders \t\tAutomatically remove Virtualbox shared folders. Shared folders may void any performance benefits from using docker-osx-dev"
-  echo -e "  -l, --log-level LOG_LEVEL\t\tSpecify the logging level. One of: $LOG_LEVELS. Default: ${DEFAULT_LOG_LEVEL}"
+  echo -e "  -l, --log-level LOG_LEVEL\t\tSpecify the logging level. One of: ${LOG_LEVELS[*]}. Default: ${DEFAULT_LOG_LEVEL}"
   echo -e "  -h, --help\t\t\t\tPrint this help text and exit."
   echo -e
   echo -e "Overview:"
@@ -991,16 +993,16 @@ function instructions {
 # be replaced.
 #
 function load_paths_from_docker_compose {
-  local readonly yaml_file_path="$1"
+  local -r yaml_file_path="$1"
   local in_volumes_block=false
   local paths=()
 
   if [[ -f "$yaml_file_path" ]]; then
     local line=""
-    while read line; do
+    while read -r line; do
       if $in_volumes_block; then
         if [[ "${line:0:2}" = "- " ]]; then
-          local readonly path=$(echo $line | sed -ne "s/- \([^:]*\):.*$/\1/p" | sed -e 's/^["'\'']//'  -e 's/["'\'']$//')
+          local path=$(echo "$line" | sed -ne "s/- \([^:]*\):.*$/\1/p" | sed -e 's/^["'\'']//'  -e 's/["'\'']$//')
           if [ ! -z "$path" ]; then
             paths+=("$path")
           fi
@@ -1027,12 +1029,12 @@ function load_paths_from_docker_compose {
 # are includes and are also ignored.
 #
 function load_exclude_paths {
-  local readonly ignore_file="$1"
+  local -r ignore_file="$1"
   local paths=()
 
   if [[ -f "$ignore_file" ]]; then
     local line=""
-    while read line; do
+    while read -r line; do
       if [[ "${line:0:1}" != "#" ]] && [[ "${line:0:1}" != "!" ]]; then
         paths+=("$line")
       fi
@@ -1050,12 +1052,12 @@ function load_exclude_paths {
 # starting with a ! are kept.
 #
 function load_include_paths {
-  local readonly ignore_file="$1"
+  local -r ignore_file="$1"
   local paths=()
 
   if [[ -f "$ignore_file" ]]; then
     local line=""
-    while read line; do
+    while read -r line; do
       if [[ "${line:0:1}" == "!" ]]; then
         paths+=("${line:1}")
       fi
@@ -1074,19 +1076,19 @@ function load_include_paths {
 # in either place, this function will fall back to DEFAULT_PATHS_TO_SYNC.
 #
 function configure_paths_to_sync {
-  local readonly compose_file="$1"
+  local -r compose_file="$1"
   shift
-  local readonly paths_to_sync_from_cmd_line=("$@")
-  local readonly paths_to_sync_from_compose_file=($(load_paths_from_docker_compose "$compose_file"))
+  local -r paths_to_sync_from_cmd_line=("$@")
+  local -r paths_to_sync_from_compose_file=($(load_paths_from_docker_compose "$compose_file"))
 
   local paths_to_sync=()
   if [[ "${#paths_to_sync_from_cmd_line[@]}" -gt 0 ]]; then
-    log_info "Using sync paths from command line args: ${paths_to_sync_from_cmd_line[@]}"
+    log_info "Using sync paths from command line args: ${paths_to_sync_from_cmd_line[*]}"
     paths_to_sync+=("${paths_to_sync_from_cmd_line[@]}")
   fi
 
   if [[ "${#paths_to_sync_from_compose_file}" -gt 0 ]]; then
-    log_info "Using sync paths from Docker Compose file at $compose_file: ${paths_to_sync_from_compose_file[@]}"
+    log_info "Using sync paths from Docker Compose file at $compose_file: ${paths_to_sync_from_compose_file[*]}"
     paths_to_sync+=("${paths_to_sync_from_compose_file[@]}")
   fi
 
@@ -1098,11 +1100,11 @@ function configure_paths_to_sync {
   local normalized_paths_to_sync=()
   local path=""
   for path in "${paths_to_sync[@]}"; do
-    local normalized_path=$(greadlink -m $(eval echo "$path"))
+    local normalized_path=$(greadlink -m "$(eval echo "$path")")
     normalized_paths_to_sync+=("$normalized_path")
   done
 
-  PATHS_TO_SYNC="${normalized_paths_to_sync[@]}"
+  PATHS_TO_SYNC="${normalized_paths_to_sync[*]}"
   log_info "Complete list of paths to sync: $PATHS_TO_SYNC"
 }
 
@@ -1117,19 +1119,19 @@ function configure_paths_to_sync {
 # DEFAULT_EXCLUDES.
 #
 function configure_excludes {
-  local readonly ignore_file="$1"
+  local -r ignore_file="$1"
   shift
-  local readonly excludes_from_cmd_line=("$@")
-  local readonly excludes_from_ignore_file=($(load_exclude_paths "$ignore_file"))
+  local -r excludes_from_cmd_line=("$*")
+  local -r excludes_from_ignore_file=($(load_exclude_paths "$ignore_file"))
 
   local excludes=()
   if [[ "${#excludes_from_cmd_line}" -gt 0 ]]; then
-    log_info "Using exclude paths from command line args: ${excludes_from_cmd_line[@]}"
+    log_info "Using exclude paths from command line args: ${excludes_from_cmd_line[*]}"
     excludes+=("${excludes_from_cmd_line[@]}")
   fi
 
   if [[ "${#excludes_from_ignore_file}" -gt 0 ]]; then
-    log_info "Using excludes from ignore file $ignore_file: ${excludes_from_ignore_file[@]}"
+    log_info "Using excludes from ignore file $ignore_file: ${excludes_from_ignore_file[*]}"
     excludes+=("${excludes_from_ignore_file[@]}")
   fi
 
@@ -1138,8 +1140,8 @@ function configure_excludes {
     excludes=($DEFAULT_EXCLUDES)
   fi
 
-  EXCLUDES="${excludes[@]}"
-  log_info "Complete list of paths to exclude: $EXCLUDES"
+  EXCLUDES=("${excludes[*]}")
+  log_info "Complete list of paths to exclude: ${EXCLUDES[*]}"
 }
 
 #
@@ -1152,24 +1154,24 @@ function configure_excludes {
 # entries as includes.
 #
 function configure_includes {
-  local readonly ignore_file="$1"
+  local -r ignore_file="$1"
   shift
-  local readonly includes_from_cmd_line=("$@")
-  local readonly includes_from_ignore_file=($(load_include_paths "$ignore_file"))
+  local -r includes_from_cmd_line=("$@")
+  local -r includes_from_ignore_file=($(load_include_paths "$ignore_file"))
 
   local includes=()
   if [[ "${#includes_from_cmd_line}" -gt 0 ]]; then
-    log_info "Using include paths from command line args: ${includes_from_cmd_line[@]}"
+    log_info "Using include paths from command line args: ${includes_from_cmd_line[*]}"
     includes+=("${includes_from_cmd_line[@]}")
   fi
 
   if [[ "${#includes_from_ignore_file}" -gt 0 ]]; then
-    log_info "Using includes from ignore file $ignore_file: ${includes_from_ignore_file[@]}"
+    log_info "Using includes from ignore file $ignore_file: ${includes_from_ignore_file[*]}"
     includes+=("${includes_from_ignore_file[@]}")
   fi
 
-  INCLUDES="${includes[@]}"
-  log_info "Complete list of paths to include: $INCLUDES"
+  INCLUDES=("${includes[*]}")
+  log_info "Complete list of paths to include: ${INCLUDES[*]}"
 }
 
 #
@@ -1178,7 +1180,7 @@ function configure_includes {
 # Runs the docker-osx-dev script to to sync files.
 #
 function sync {
-  local readonly remove_shared_folders=$1
+  local -r remove_shared_folders=$1
 
   log_info "Starting docker-osx-dev file syncing"
   init_docker_host "$remove_shared_folders"
@@ -1194,9 +1196,9 @@ function sync {
 #
 function install {
   log_info "Starting install of docker-osx-dev"
-  local readonly skip_dependencies=$1
-  local readonly only_dependencies=$2
-  local readonly remove_shared_folders=$3
+  local -r skip_dependencies=$1
+  local -r only_dependencies=$2
+  local -r remove_shared_folders=$3
   if test -z "$skip_dependencies" ; then
     install_dependencies
   fi
@@ -1234,8 +1236,8 @@ function test_mode {
 #   prints error, instructions, and exits with error code 1
 #
 function assert_valid_arg {
-  local readonly arg="$1"
-  local readonly arg_name="$2"
+  local -r arg="$1"
+  local -r arg_name="$2"
 
   if [[ -z "$arg" || "${arg:0:1}" = "-" ]]; then
     log_error "You must provide a value for argument $arg_name"
@@ -1261,7 +1263,7 @@ function handle_command {
   local excludes=()
   local includes=()
 
-  while [[ $# > 0 ]]; do
+  while [[ $# -gt 0 ]]; do
     key="$1"
 
     case $key in
@@ -1316,13 +1318,13 @@ function handle_command {
         shift
         ;;
       -r|--remove-shared-folders)
-        local readonly remove_shared_folders=true
+        local -r remove_shared_folders=true
         ;;
       --only-dependencies)
-        local readonly only_dependencies=true
+        local -r only_dependencies=true
         ;;
       --skip-dependencies)
-        local readonly skip_dependencies=true
+        local -r skip_dependencies=true
         ;;
       -h|--help)
         instructions
