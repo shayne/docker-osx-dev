@@ -779,7 +779,7 @@ function print_next_steps {
 function find_path_to_sync_parent {
   local -r path="$1"
   local -r normalized_path=$(greadlink -m "$path")
-  local -r paths_to_sync=($PATHS_TO_SYNC)
+  local -r paths_to_sync=("${PATHS_TO_SYNC[@]}")
 
   local path_to_sync=""
   for path_to_sync in "${paths_to_sync[@]}"; do
@@ -819,7 +819,7 @@ function do_rsync {
 
     local -r rsh_flag="--rsh=\"ssh -i $DOCKER_HOST_SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\""
 
-    local -r rsync_cmd="rsync $RSYNC_FLAGS $include_flags $exclude_flags $rsh_flag $path_to_sync $DOCKER_HOST_SSH_URL:$parent_folder 2>&1 | grep -v \"^Warning: Permanently added\""
+    local -r rsync_cmd="rsync $RSYNC_FLAGS $include_flags $exclude_flags $rsh_flag '$path_to_sync' $DOCKER_HOST_SSH_URL:'$parent_folder' 2>&1 | grep -v \"^Warning: Permanently added\""
     log_debug "$rsync_cmd"
 
     eval "$rsync_cmd" 2>&1 | log_info
@@ -838,7 +838,7 @@ function do_rsync {
 #   Result: /foo and /bar are rsync'ed to the Boot2DockerVM
 #
 function do_sync {
-  local -r paths_to_sync=("$@")
+  local -r paths_to_sync="$*"
   local path=""
 
   for path in "${paths_to_sync[@]}"; do
@@ -852,21 +852,21 @@ function do_sync {
 # Sets up all necessary parent directories and permissions for PATHS in the
 # Boot2Docker VM.
 function create_sync_directories {
-  local -r paths_to_sync=("$@")
+  local -r paths_to_sync="$*"
 
   local dirs_to_create=()
   local path=""
 
   for path in "${paths_to_sync[@]}"; do
-    local -r parent_dir=$(dirname "$path")
+    local parent_dir=$(dirname "$path")
     if [[ "$parent_dir" != "/" ]]; then
       dirs_to_create+=("$parent_dir")
     fi
   done
 
   local -r dir_string=$(join " " "${dirs_to_create[@]}")
-  local -r mkdir_string="sudo mkdir -p $dir_string"
-  local -r chown_string="sudo chown -R $DOCKER_HOST_USER $dir_string"
+  local -r mkdir_string="sudo mkdir -p '$dir_string'"
+  local -r chown_string="sudo chown -R $DOCKER_HOST_USER '$dir_string'"
   local -r ssh_cmd="$mkdir_string && $chown_string"
 
   log_debug "Creating parent directories in Docker VM: $ssh_cmd"
@@ -879,7 +879,7 @@ function create_sync_directories {
 # Use tar to set up the initial sync of PATHS in the Boot2Docker VM, which
 # is faster than letting rsync do it.
 function tar_sync {
-  local -r paths_to_sync=("$@")
+  local -r paths_to_sync="$*"
 
   local path=""
   local parent_dir=""
@@ -896,7 +896,7 @@ function tar_sync {
       log_debug "skipped tar for $parent_dir/$base_name"
     else
       log_info "Initial sync using tar for $parent_dir/$base_name"
-      tar -cC "$parent_dir" "$include_flags" "$exclude_flags" "$base_name" | $DOCKER_HOST_SSH_COMMAND "tar -xC '$parent_dir'"
+      tar -cC "$parent_dir" "$base_name" "$include_flags" "$exclude_flags" | $DOCKER_HOST_SSH_COMMAND "tar -xC '$parent_dir'"
     fi
   done
 }
@@ -1070,7 +1070,7 @@ function load_include_paths {
 #
 # Usage: configure_paths_to_sync COMPOSE_FILE [PATHS_FROM_CMD_LINE ...]
 #
-# Set \the paths that should be synced to the Boot2Docker VM. These
+# Set the paths that should be synced to the Boot2Docker VM. These
 # paths will be read from the Docker Compose file COMPOSE_FILE as well as paths
 # specified via the command line as PATHS_FROM_CMD_LINE. If no paths are found
 # in either place, this function will fall back to DEFAULT_PATHS_TO_SYNC.
@@ -1104,7 +1104,7 @@ function configure_paths_to_sync {
     normalized_paths_to_sync+=("$normalized_path")
   done
 
-  PATHS_TO_SYNC="${normalized_paths_to_sync[*]}"
+  PATHS_TO_SYNC=("${normalized_paths_to_sync[@]}")
   log_info "Complete list of paths to sync: $PATHS_TO_SYNC"
 }
 
